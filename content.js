@@ -9,6 +9,7 @@ class OnlyFansDownloader {
     this.videoStore = new Map();
     this.imageStore = new Map();
     this.networkVideoUrls = new Map(); // Store video URLs captured from network requests
+    this.videoJsMonitors = {}; // Store interval IDs for video.js player monitoring
     this.settings = {
       quality: 'full',
       autoCreateFolder: true
@@ -2009,6 +2010,36 @@ class OnlyFansDownloader {
         this.handleVideoPlay(event.target);
       }
     }, true);
+    
+    // Listen for video pause events to stop monitoring
+    document.addEventListener('pause', (event) => {
+      if (event.target.tagName === 'VIDEO') {
+        const videoJsPlayer = event.target.closest('.video-js');
+        if (videoJsPlayer && videoJsPlayer.id && this.videoJsMonitors) {
+          const playerId = videoJsPlayer.id;
+          if (this.videoJsMonitors[playerId]) {
+            clearInterval(this.videoJsMonitors[playerId]);
+            delete this.videoJsMonitors[playerId];
+            console.log('⏸️ Stopped monitoring video.js player:', playerId);
+          }
+        }
+      }
+    }, true);
+    
+    // Listen for video ended events to stop monitoring
+    document.addEventListener('ended', (event) => {
+      if (event.target.tagName === 'VIDEO') {
+        const videoJsPlayer = event.target.closest('.video-js');
+        if (videoJsPlayer && videoJsPlayer.id && this.videoJsMonitors) {
+          const playerId = videoJsPlayer.id;
+          if (this.videoJsMonitors[playerId]) {
+            clearInterval(this.videoJsMonitors[playerId]);
+            delete this.videoJsMonitors[playerId];
+            console.log('⏹️ Stopped monitoring video.js player (ended):', playerId);
+          }
+        }
+      }
+    }, true);
 
     // Listen for click events on play buttons
     document.addEventListener('click', (event) => {
@@ -2040,6 +2071,65 @@ class OnlyFansDownloader {
         }
       }
     }, true);
+  }
+
+  /**
+   * Check video.js player sources when video is played
+   */
+  checkVideoJsPlayerSources(videoJsPlayer) {
+    if (!videoJsPlayer || !videoJsPlayer.id) {
+      return;
+    }
+    
+    try {
+      if (typeof videojs !== 'undefined') {
+        const player = videojs(videoJsPlayer.id);
+        if (player) {
+          let foundUrl = null;
+          
+          // Check httpSourceSelector sources
+          if (player.httpSourceSelector && player.httpSourceSelector.sources) {
+            const sources = player.httpSourceSelector.sources;
+            for (const src of sources) {
+              if (src.src && !src.src.startsWith('blob:') && this.isVideoCdnUrl(src.src)) {
+                foundUrl = src.src;
+                console.log('✅ Found video URL from video.js player sources:', foundUrl);
+                break;
+              }
+            }
+          }
+          
+          // Also check currentSrc
+          if (!foundUrl && player.currentSrc) {
+            const currentSrc = player.currentSrc();
+            if (currentSrc && !currentSrc.startsWith('blob:') && this.isVideoCdnUrl(currentSrc)) {
+              foundUrl = currentSrc;
+              console.log('✅ Found video URL from video.js player currentSrc:', foundUrl);
+            }
+          }
+          
+          // If we found a URL, update or create button
+          if (foundUrl) {
+            this.captureVideoUrl(foundUrl);
+            
+            const post = videoJsPlayer.closest('.b-post');
+            if (post) {
+              // Try to update existing button first
+              const updated = this.updateVideoDownloadButton(post, foundUrl);
+              
+              if (!updated) {
+                // No existing button, try to match and create
+                setTimeout(() => {
+                  this.matchVideoUrlToPost(foundUrl);
+                }, 500);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.log('⚠️ Error checking video.js player sources:', e);
+    }
   }
 
   /**
@@ -2137,24 +2227,236 @@ class OnlyFansDownloader {
   }
 
   /**
+   * Update existing video download button with new URL
+   */
+  updateVideoDownloadButton(post, newVideoUrl) {
+    if (!newVideoUrl || newVideoUrl.startsWith('blob:')) {
+      return false;
+    }
+    
+    const existingButtons = post.querySelectorAll(`.${this.uniqueClass} button`);
+    let updated = false;
+    
+    existingButtons.forEach(btn => {
+      const buttonText = btn.textContent || '';
+      if (buttonText.includes('Video') || buttonText.includes('video') || buttonText.includes('🎬')) {
+        // Check if the button already has this URL
+        const buttonContainer = btn.closest(`.${this.uniqueClass}`);
+        if (buttonContainer) {
+          const onclick = btn.getAttribute('onclick') || '';
+          const dataUrl = btn.getAttribute('data-url') || buttonContainer.getAttribute('data-url') || '';
+          const cleanNewUrl = newVideoUrl.split('?')[0];
+          const cleanOldUrl = (onclick.match(/https?:\/\/[^\s"']+/) || [dataUrl])[0]?.split('?')[0] || '';
+          
+          // Only update if URL is different
+          if (cleanOldUrl && cleanOldUrl !== cleanNewUrl) {
+            console.log('🔄 Updating existing video button with new streaming URL');
+            
+            // Update the button's onclick handler
+            btn.setAttribute('onclick', `window.downloadMedia('${newVideoUrl}')`);
+            btn.setAttribute('data-url', newVideoUrl);
+            if (buttonContainer) {
+              buttonContainer.setAttribute('data-url', newVideoUrl);
+            }
+            
+            // Update button text to indicate it's been updated
+            if (!buttonText.includes('🔄')) {
+              btn.textContent = buttonText.replace(/🎬|Video|video/, '🎬 Video');
+            }
+            
+            updated = true;
+          } else if (!cleanOldUrl) {
+            // Button exists but has no URL, update it
+            btn.setAttribute('onclick', `window.downloadMedia('${newVideoUrl}')`);
+            btn.setAttribute('data-url', newVideoUrl);
+            if (buttonContainer) {
+              buttonContainer.setAttribute('data-url', newVideoUrl);
+            }
+            updated = true;
+          }
+        }
+      }
+    });
+    
+    return updated;
+  }
+
+  /**
+   * Continuously monitor video.js player sources during playback
+   */
+  monitorVideoJsPlayerSources(videoJsPlayer) {
+    if (!videoJsPlayer || !videoJsPlayer.id) {
+      return;
+    }
+    
+    // Clear any existing monitoring for this player
+    const playerId = videoJsPlayer.id;
+    if (this.videoJsMonitors && this.videoJsMonitors[playerId]) {
+      clearInterval(this.videoJsMonitors[playerId]);
+    }
+    
+    if (!this.videoJsMonitors) {
+      this.videoJsMonitors = {};
+    }
+    
+    // Monitor every 1 second while video is playing
+    const monitorInterval = setInterval(() => {
+      try {
+        if (typeof videojs !== 'undefined') {
+          const player = videojs(playerId);
+          if (player && !player.paused()) {
+            // Video is playing, check for source changes
+            let currentUrl = null;
+            
+            // Check httpSourceSelector sources
+            if (player.httpSourceSelector && player.httpSourceSelector.sources) {
+              const sources = player.httpSourceSelector.sources;
+              for (const src of sources) {
+                if (src.src && !src.src.startsWith('blob:') && this.isVideoCdnUrl(src.src)) {
+                  currentUrl = src.src;
+                  break;
+                }
+              }
+            }
+            
+            // Check currentSrc
+            if (!currentUrl && player.currentSrc) {
+              const currentSrc = player.currentSrc();
+              if (currentSrc && !currentSrc.startsWith('blob:') && this.isVideoCdnUrl(currentSrc)) {
+                currentUrl = currentSrc;
+              }
+            }
+            
+            // If we found a URL, try to update the button
+            if (currentUrl) {
+              const post = videoJsPlayer.closest('.b-post');
+              if (post) {
+                this.captureVideoUrl(currentUrl);
+                const updated = this.updateVideoDownloadButton(post, currentUrl);
+                if (!updated) {
+                  // Button doesn't exist or couldn't be updated, try to create one
+                  setTimeout(() => {
+                    this.matchVideoUrlToPost(currentUrl);
+                  }, 500);
+                }
+              }
+            }
+          } else if (player && player.paused()) {
+            // Video is paused, stop monitoring
+            clearInterval(monitorInterval);
+            if (this.videoJsMonitors) {
+              delete this.videoJsMonitors[playerId];
+            }
+          }
+        }
+      } catch (e) {
+        // Player might have been removed, stop monitoring
+        clearInterval(monitorInterval);
+        if (this.videoJsMonitors) {
+          delete this.videoJsMonitors[playerId];
+        }
+      }
+    }, 1000);
+    
+    this.videoJsMonitors[playerId] = monitorInterval;
+  }
+
+  /**
    * Handle video play event
    */
   handleVideoPlay(video) {
-    // Same as handleVideoLoad but triggered on play
-    this.handleVideoLoad(video);
+    console.log('▶️ Video started playing:', video);
     
-    // Don't refresh buttons on play if button already exists - it causes buttons to disappear
-    // The button should already be there from initial detection
+    // Find the post containing this video
     const post = video.closest('.b-post');
-    if (post) {
-      const existingButton = post.querySelector(`.${this.uniqueClass}`);
-      if (!existingButton) {
-        // Only refresh if button doesn't exist
-        console.log('▶️ Video started playing, button missing, creating button...');
-        setTimeout(() => {
-          this.refreshButtonsOnMediaChange(post);
-        }, 300);
+    if (!post) {
+      console.log('⚠️ No post found for playing video');
+      return;
+    }
+    
+    // Start monitoring video.js player sources if applicable
+    const videoJsPlayer = video.closest('.video-js');
+    if (videoJsPlayer && videoJsPlayer.id) {
+      console.log('🎥 Starting continuous monitoring of video.js player sources');
+      this.monitorVideoJsPlayerSources(videoJsPlayer);
+      
+      // Also check immediately
+      setTimeout(() => {
+        this.checkVideoJsPlayerSources(videoJsPlayer);
+      }, 500);
+    }
+    
+    // Try multiple methods to get the video URL (whether button exists or not)
+    console.log('▶️ Video playing, attempting to extract streaming URL...');
+    
+    // Method 1: Try to extract from video.js player
+    let videoUrl = null;
+    if (videoJsPlayer) {
+      videoUrl = this.extractVideoUrlFromVideoJsPlayer(videoJsPlayer);
+    }
+    
+    // Method 2: Try to extract from video element directly
+    if (!videoUrl || videoUrl.startsWith('blob:')) {
+      videoUrl = this.extractVideoUrlFromElement(video);
+    }
+    
+    // Method 3: Check networkVideoUrls for recently captured URLs
+    if (!videoUrl || videoUrl.startsWith('blob:')) {
+      const postId = post.getAttribute('data-id') || post.id || post.getAttribute('id');
+      if (postId) {
+        // Check all captured URLs for this post
+        for (const [cleanUrl, data] of this.networkVideoUrls.entries()) {
+          // Check if URL contains post ID or if it was captured recently (within last 10 seconds)
+          const isRecent = (Date.now() - data.timestamp) < 10000;
+          if (isRecent && (data.url.includes(postId) || this.isVideoCdnUrl(data.url))) {
+            videoUrl = data.url;
+            console.log('✅ Found video URL from network capture:', videoUrl);
+            break;
+          }
+        }
       }
+      
+      // If still no URL, try to match any recently captured video URL to this post
+      if (!videoUrl || videoUrl.startsWith('blob:')) {
+        const videoWrapper = post.querySelector('.video-wrapper');
+        const videoJsPlayer2 = post.querySelector('.video-js');
+        if (videoWrapper || videoJsPlayer2) {
+          // Get the most recently captured video URL (within last 5 seconds)
+          let mostRecentUrl = null;
+          let mostRecentTime = 0;
+          for (const [cleanUrl, data] of this.networkVideoUrls.entries()) {
+            if ((Date.now() - data.timestamp) < 5000 && data.timestamp > mostRecentTime) {
+              mostRecentTime = data.timestamp;
+              mostRecentUrl = data.url;
+            }
+          }
+          if (mostRecentUrl) {
+            videoUrl = mostRecentUrl;
+            console.log('✅ Using most recently captured video URL:', videoUrl);
+          }
+        }
+      }
+    }
+    
+    // If we found a valid URL, update or create the button
+    if (videoUrl && !videoUrl.startsWith('blob:')) {
+      // Try to update existing button first
+      const updated = this.updateVideoDownloadButton(post, videoUrl);
+      
+      if (!updated) {
+        // No existing button or couldn't update, create new one
+        const container = video.closest('.video-wrapper, .video-js') || post;
+        console.log('✅ Creating video download button with streaming URL:', videoUrl.substring(0, 100) + '...');
+        this.createVideoDownloadButton(container, videoUrl);
+      } else {
+        console.log('✅ Updated existing video button with streaming URL');
+      }
+    } else {
+      // Still no URL, wait a bit and try again (video might still be loading)
+      console.log('⚠️ No streaming URL found yet, will retry...');
+      setTimeout(() => {
+        this.handleVideoPlay(video);
+      }, 2000);
     }
   }
 
@@ -3499,7 +3801,10 @@ class OnlyFansDownloader {
     const videoCdnPatterns = [
       /cdn\d*\.onlyfans\.com.*\/\d+\/videos\/.*\.mp4/i,
       /cdn\d*\.onlyfans\.com.*\/videos\/.*\.mp4/i,
-      /cdn\d*\.onlyfans\.com.*\/\d+\/videos\/.*\.m3u8/i
+      /cdn\d*\.onlyfans\.com.*\/\d+\/videos\/.*\.m3u8/i,
+      /cdn\d*\.onlyfans\.com.*\/files\/.*\.mp4/i,
+      /cdn\d*\.onlyfans\.com.*\/\d+\/.*\.mp4/i,
+      /cdn\d*\.onlyfans\.com.*\/.*\.m3u8/i
     ];
     
     return videoCdnPatterns.some(pattern => pattern.test(url));
@@ -3533,81 +3838,169 @@ class OnlyFansDownloader {
     // Clean URL (remove query params for matching)
     const cleanUrl = url.split('?')[0];
     
-    // Store the URL (only if not already stored)
-    if (!this.networkVideoUrls.has(cleanUrl)) {
+    // Store the URL (update timestamp if already exists, or add new entry)
+    const existingData = this.networkVideoUrls.get(cleanUrl);
+    if (!existingData) {
       this.networkVideoUrls.set(cleanUrl, {
         url: url,
         timestamp: Date.now()
       });
-      console.log('💾 Stored video URL:', cleanUrl);
+      console.log('💾 Stored new video URL:', cleanUrl);
+    } else {
+      // Update timestamp to mark as recently captured
+      existingData.timestamp = Date.now();
+      existingData.url = url; // Update URL in case query params changed
+      console.log('🔄 Updated video URL timestamp:', cleanUrl);
       
-      // Debounce matching to prevent rapid calls
-      if (this.matchVideoUrlTimeout) {
-        clearTimeout(this.matchVideoUrlTimeout);
+      // If URL was already stored, try to update buttons immediately for all posts with videos
+      // This helps when the streaming URL changes
+      const posts = document.querySelectorAll('.b-post');
+      for (const post of posts) {
+        const videoWrapper = post.querySelector('.video-wrapper');
+        const videoJsPlayer = post.querySelector('.video-js');
+        const videos = post.querySelectorAll('video');
+        
+        if (videoWrapper || videoJsPlayer || videos.length > 0) {
+          // Check if any video in this post is currently playing
+          let isPlaying = false;
+          videos.forEach(video => {
+            if (!video.paused && !video.ended) {
+              isPlaying = true;
+            }
+          });
+          
+          // If video is playing, try to update button immediately
+          if (isPlaying) {
+            this.updateVideoDownloadButton(post, url);
+          }
+        }
       }
-      this.matchVideoUrlTimeout = setTimeout(() => {
-        this.matchVideoUrlToPost(url);
-      }, 1000); // Wait 1 second before matching
     }
+    
+    // Try to match immediately (less debounce for active video loading)
+    if (this.matchVideoUrlTimeout) {
+      clearTimeout(this.matchVideoUrlTimeout);
+    }
+    this.matchVideoUrlTimeout = setTimeout(() => {
+      this.matchVideoUrlToPost(url);
+    }, 500); // Reduced from 1000ms to 500ms for faster matching
   }
 
   /**
    * Try to match captured video URL to a post and update buttons
    */
   matchVideoUrlToPost(videoUrl) {
+    if (!videoUrl || videoUrl.startsWith('blob:')) {
+      return;
+    }
+    
+    console.log('🔍 Matching video URL to post:', videoUrl.substring(0, 100) + '...');
+    
     // Find all posts with video elements
     const posts = document.querySelectorAll('.b-post');
     
-    posts.forEach(post => {
-      // Check if this post has a video
-      const videoWrapper = post.querySelector('.video-wrapper');
-      const videoJsPlayer = post.querySelector('.video-js');
-      const videos = post.querySelectorAll('video');
-      
-      if (videoWrapper || videoJsPlayer || videos.length > 0) {
-        // Check if this post already has a video button
-        const existingButtons = post.querySelectorAll(`.${this.uniqueClass} button`);
-        let hasVideoButton = false;
+    // First, try to match by post ID
+    let matchedPost = null;
+    for (const post of posts) {
+      const postId = post.getAttribute('data-id') || post.id || post.getAttribute('id');
+      if (postId && videoUrl.includes(postId)) {
+        matchedPost = post;
+        console.log('✅ Matched video URL to post by ID:', postId);
+        break;
+      }
+    }
+    
+    // If no ID match, try to match by finding posts with videos that don't have buttons
+    if (!matchedPost) {
+      for (const post of posts) {
+        const videoWrapper = post.querySelector('.video-wrapper');
+        const videoJsPlayer = post.querySelector('.video-js');
+        const videos = post.querySelectorAll('video');
         
-        existingButtons.forEach(btn => {
-          const buttonText = btn.textContent || '';
-          if (buttonText.includes('Video') || buttonText.includes('video') || buttonText.includes('🎬')) {
-            hasVideoButton = true;
-          }
-        });
-        
-        // If no video button exists, create one (even if image buttons exist)
-        if (!hasVideoButton) {
-          // Try to extract post ID to match
-          const postId = post.getAttribute('data-id') || post.id;
+        if (videoWrapper || videoJsPlayer || videos.length > 0) {
+          // Check if this post already has a video button
+          const existingButtons = post.querySelectorAll(`.${this.uniqueClass} button`);
+          let hasVideoButton = false;
           
-          // Check if video URL matches this post (by checking if URL contains post ID)
-          if (postId && videoUrl.includes(postId)) {
-            console.log('✅ Matched video URL to post:', postId);
-            this.createVideoDownloadButton(videoWrapper || videoJsPlayer || videos[0]?.closest('.video-wrapper, .video-js') || post, videoUrl);
-          } else {
-            // If no post ID match, try to match by checking if video is in this post
-            // We'll create a button anyway since we have the URL and the post has a video
-            setTimeout(() => {
-              const existingBtns = post.querySelectorAll(`.${this.uniqueClass} button`);
-              let stillNoVideoButton = true;
-              
-              existingBtns.forEach(btn => {
-                const buttonText = btn.textContent || '';
-                if (buttonText.includes('Video') || buttonText.includes('video') || buttonText.includes('🎬')) {
-                  stillNoVideoButton = false;
-                }
-              });
-              
-              if (stillNoVideoButton) {
-                console.log('✅ Creating button for captured video URL in post');
-                this.createVideoDownloadButton(videoWrapper || videoJsPlayer || videos[0]?.closest('.video-wrapper, .video-js') || post, videoUrl);
+          existingButtons.forEach(btn => {
+            const buttonText = btn.textContent || '';
+            if (buttonText.includes('Video') || buttonText.includes('video') || buttonText.includes('🎬')) {
+              hasVideoButton = true;
+            }
+          });
+          
+          // If no video button exists, this might be the post
+          if (!hasVideoButton) {
+            // Check if any video in this post is currently playing or has blob URL
+            let hasBlobVideo = false;
+            videos.forEach(video => {
+              if (video.src && video.src.startsWith('blob:')) {
+                hasBlobVideo = true;
               }
-            }, 1000);
+            });
+            
+            // If this post has a blob video, it's likely the one
+            if (hasBlobVideo) {
+              matchedPost = post;
+              console.log('✅ Matched video URL to post with blob video');
+              break;
+            }
           }
         }
       }
-    });
+    }
+    
+    // If we found a matching post, update or create the button
+    if (matchedPost) {
+      // Try to update existing button first
+      const updated = this.updateVideoDownloadButton(matchedPost, videoUrl);
+      
+      if (!updated) {
+        // No existing button, create new one
+        const videoWrapper = matchedPost.querySelector('.video-wrapper');
+        const videoJsPlayer = matchedPost.querySelector('.video-js');
+        const videos = matchedPost.querySelectorAll('video');
+        const container = videoWrapper || videoJsPlayer || videos[0]?.closest('.video-wrapper, .video-js') || matchedPost;
+        console.log('✅ Creating video download button for matched post');
+        this.createVideoDownloadButton(container, videoUrl);
+      } else {
+        console.log('✅ Updated existing video button for matched post');
+      }
+    } else {
+      // No direct match found, try to match to any post with video that doesn't have a button
+      console.log('⚠️ No direct match found, trying to match to any post with video...');
+      for (const post of posts) {
+        const videoWrapper = post.querySelector('.video-wrapper');
+        const videoJsPlayer = post.querySelector('.video-js');
+        const videos = post.querySelectorAll('video');
+        
+        if (videoWrapper || videoJsPlayer || videos.length > 0) {
+          const existingButtons = post.querySelectorAll(`.${this.uniqueClass} button`);
+          let hasVideoButton = false;
+          
+          existingButtons.forEach(btn => {
+            const buttonText = btn.textContent || '';
+            if (buttonText.includes('Video') || buttonText.includes('video') || buttonText.includes('🎬')) {
+              hasVideoButton = true;
+            }
+          });
+          
+          // Try to update existing button first
+          const updated = this.updateVideoDownloadButton(post, videoUrl);
+          
+          if (!updated && !hasVideoButton) {
+            // No existing button, create new one
+            const container = videoWrapper || videoJsPlayer || videos[0]?.closest('.video-wrapper, .video-js') || post;
+            console.log('✅ Creating video download button for post with video (no direct match)');
+            this.createVideoDownloadButton(container, videoUrl);
+            break; // Only create one button per URL
+          } else if (updated) {
+            console.log('✅ Updated existing video button for post with video');
+            break;
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -3683,6 +4076,14 @@ class OnlyFansDownloader {
           processedVideoSources.add(src);
           console.log('📹 Found video URL from loadedmetadata:', src);
           this.captureVideoUrl(src);
+          
+          // Immediately try to match to post
+          const post = video.closest('.b-post');
+          if (post) {
+            setTimeout(() => {
+              this.matchVideoUrlToPost(src);
+            }, 500);
+          }
         }
       }
     }, true);
@@ -3698,6 +4099,67 @@ class OnlyFansDownloader {
           processedVideoSources.add(src);
           console.log('📹 Found video URL from loadstart:', src);
           this.captureVideoUrl(src);
+          
+          // Immediately try to match to post
+          const post = video.closest('.b-post');
+          if (post) {
+            setTimeout(() => {
+              this.matchVideoUrlToPost(src);
+            }, 500);
+          }
+        }
+      }
+    }, true);
+    
+    // Listen for canplay event (video is ready to play)
+    document.addEventListener('canplay', (event) => {
+      if (event.target.tagName === 'VIDEO') {
+        const video = event.target;
+        const src = video.currentSrc || video.src;
+        
+        // Also check video.js player sources
+        const videoJsPlayer = video.closest('.video-js');
+        if (videoJsPlayer && videoJsPlayer.id) {
+          setTimeout(() => {
+            this.checkVideoJsPlayerSources(videoJsPlayer);
+          }, 500);
+        }
+        
+        // Check if we have a captured URL for this video
+        if (src && src.startsWith('blob:')) {
+          // Video is using blob URL, check if we have the actual CDN URL
+          const post = video.closest('.b-post');
+          if (post) {
+            const postId = post.getAttribute('data-id') || post.id || post.getAttribute('id');
+            if (postId) {
+              // Look for recently captured URLs
+              for (const [cleanUrl, data] of this.networkVideoUrls.entries()) {
+                const isRecent = (Date.now() - data.timestamp) < 10000;
+                if (isRecent && (data.url.includes(postId) || this.isVideoCdnUrl(data.url))) {
+                  console.log('📹 Found matching video URL for blob video:', data.url);
+                  const updated = this.updateVideoDownloadButton(post, data.url);
+                  if (!updated) {
+                    setTimeout(() => {
+                      this.matchVideoUrlToPost(data.url);
+                    }, 500);
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        } else if (src && !src.startsWith('blob:') && this.isVideoCdnUrl(src)) {
+          // Video has a real CDN URL, update button
+          const post = video.closest('.b-post');
+          if (post) {
+            this.captureVideoUrl(src);
+            const updated = this.updateVideoDownloadButton(post, src);
+            if (!updated) {
+              setTimeout(() => {
+                this.matchVideoUrlToPost(src);
+              }, 500);
+            }
+          }
         }
       }
     }, true);
