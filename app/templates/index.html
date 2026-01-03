@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnlyFans Downloader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-download"></i> OnlyFans Downloader</h1>
+            <p class="subtitle">Download photos and videos from OnlyFans profiles</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Login Section -->
+            <section class="card" id="loginSection">
+                <h2><i class="fas fa-sign-in-alt"></i> Login</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="email"><i class="fas fa-envelope"></i> Email</label>
+                        <input type="email" id="email" name="email" required placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="password"><i class="fas fa-lock"></i> Password</label>
+                        <input type="password" id="password" name="password" required placeholder="Your password">
+                    </div>
+                    <div class="form-group">
+                        <label for="twoFactor"><i class="fas fa-shield-alt"></i> 2FA Code (Optional)</label>
+                        <input type="text" id="twoFactor" name="twoFactor" placeholder="Leave empty if not needed">
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="loginBtn">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                </form>
+                <div id="loginStatus" class="status-message"></div>
+            </section>
+
+            <!-- Download Section -->
+            <section class="card" id="downloadSection" style="display: none;">
+                <h2><i class="fas fa-cloud-download-alt"></i> Download Content</h2>
+                <form id="downloadForm">
+                    <div class="form-group">
+                        <label for="username"><i class="fas fa-user"></i> Creator Username</label>
+                        <input type="text" id="username" name="username" required placeholder="creator_username">
+                        <small>Enter the OnlyFans username (without @)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="maxPosts"><i class="fas fa-list-ol"></i> Max Posts (Optional)</label>
+                        <input type="number" id="maxPosts" name="maxPosts" min="1" placeholder="Leave empty for all posts">
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="downloadMedia" name="downloadMedia" checked>
+                            <span>Download media files (uncheck for metadata only)</span>
+                        </label>
+                    </div>
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-success" id="downloadBtn">
+                            <i class="fas fa-download"></i> Start Download
+                        </button>
+                        <button type="button" class="btn btn-danger" id="stopBtn" style="display: none;">
+                            <i class="fas fa-stop"></i> Stop
+                        </button>
+                    </div>
+                </form>
+                <div id="downloadStatus" class="status-message"></div>
+            </section>
+
+            <!-- Progress Section -->
+            <section class="card" id="progressSection" style="display: none;">
+                <h2><i class="fas fa-tasks"></i> Progress</h2>
+                <div class="progress-info">
+                    <div class="progress-item">
+                        <span class="label">Status:</span>
+                        <span class="value" id="currentAction">Idle</span>
+                    </div>
+                    <div class="progress-item">
+                        <span class="label">Posts:</span>
+                        <span class="value" id="postsProgress">0 / 0</span>
+                    </div>
+                    <div class="progress-item">
+                        <span class="label">Files:</span>
+                        <span class="value" id="filesProgress">0</span>
+                    </div>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">0%</div>
+                </div>
+            </section>
+
+            <!-- Logs Section -->
+            <section class="card" id="logsSection">
+                <div class="logs-header">
+                    <h2><i class="fas fa-terminal"></i> Logs</h2>
+                    <button class="btn btn-small" id="clearLogsBtn">
+                        <i class="fas fa-trash"></i> Clear
+                    </button>
+                </div>
+                <div class="logs-container" id="logsContainer">
+                    <div class="log-entry info">
+                        <span class="log-time">--:--:--</span>
+                        <span class="log-message">Ready to start...</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p>OnlyFans Downloader v1.0 | Use responsibly and in accordance with Terms of Service</p>
+        </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
+
+

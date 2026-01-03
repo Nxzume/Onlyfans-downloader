@@ -1,0 +1,99 @@
+{
+  "manifest_version": 3,
+  "name": "Universal Media Downloader",
+  "version": "7.0.0",
+  "description": "Download content from OnlyFans, Coomer, and Kemono sites",
+  "icons": {
+    "128": "/assets/icon128.png",
+    "48": "/assets/icon48.png",
+    "16": "/assets/icon16.png"
+  },
+  "action": {
+    "default_icon": "/assets/icon16.png",
+    "default_popup": "popup.html",
+    "default_title": "Universal Media Downloader"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.onlyfans.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://coomer.su/*",
+        "https://coomer.st/*",
+        "https://*.coomer.st/*",
+        "https://*.coomer.su/*",
+        "https://kemono.su/*",
+        "https://kemono.cr/*",
+        "https://*.kemono.su/*",
+        "https://*.kemono.cr/*",
+        "https://coomer.party/*",
+        "https://*.coomer.party/*",
+        "https://coomer.net/*",
+        "https://*.coomer.net/*",
+        "https://coomer.lol/*",
+        "https://*.coomer.lol/*",
+        "https://kemono.party/*",
+        "https://*.kemono.party/*",
+        "https://kemono.net/*",
+        "https://*.kemono.net/*",
+        "https://kemono.lol/*",
+        "https://*.kemono.lol/*",
+        "https://animedao.site/kemono/*",
+        "https://*.animedao.site/kemono/*"
+      ],
+      "js": [
+        "site_detection.js",
+        "content_coomer.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "downloads",
+    "webRequest",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*.onlyfans.com/*",
+    "https://coomer.su/*",
+    "https://coomer.st/*",
+    "https://*.coomer.st/*",
+    "https://*.coomer.su/*",
+    "https://kemono.su/*",
+    "https://kemono.cr/*",
+    "https://*.kemono.su/*",
+    "https://*.kemono.cr/*",
+    "https://coomer.party/*",
+    "https://*.coomer.party/*",
+    "https://coomer.net/*",
+    "https://*.coomer.net/*",
+    "https://coomer.lol/*",
+    "https://*.coomer.lol/*",
+    "https://kemono.party/*",
+    "https://*.kemono.party/*",
+    "https://kemono.net/*",
+    "https://*.kemono.net/*",
+    "https://kemono.lol/*",
+    "https://*.kemono.lol/*",
+    "https://animedao.site/*",
+    "https://*.animedao.site/*",
+    "https://img.coomer.st/*",
+    "https://img.coomer.su/*",
+    "https://img.coomer.party/*",
+    "https://img.coomer.net/*",
+    "https://img.coomer.lol/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

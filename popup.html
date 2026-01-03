@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Universal Media Downloader</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #1a1a1a;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 16px;
+      width: 380px;
+      min-height: 400px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #ffffff;
+      text-align: center;
+    }
+
+    p {
+      margin: 8px 0;
+      color: #b0b0b0;
+      font-size: 13px;
+    }
+
+    strong {
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    em {
+      color: #ff6b6b;
+      font-style: normal;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid #2d2d2d;
+      margin: 16px 0;
+    }
+
+    /* Site Indicator */
+    #siteIndicator {
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      text-align: center;
+      font-size: 12px;
+      color: #a0a0a0;
+    }
+
+    #siteIndicator.active {
+      background: #1e3a5f;
+      border-color: #4a9eff;
+      color: #4a9eff;
+    }
+
+    /* Quick Links */
+    .quick-links {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin: 12px 0 16px;
+      flex-wrap: wrap;
+    }
+
+    .quick-link {
+      display: inline-block;
+      padding: 6px 10px;
+      background: #2d2d2d;
+      color: #e0e0e0;
+      text-decoration: none;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 500;
+      transition: all 0.2s;
+      border: 1px solid #3d3d3d;
+    }
+
+    .quick-link:hover {
+      background: #353535;
+      border-color: #4d4d4d;
+      transform: translateY(-1px);
+    }
+
+    .quick-link.onlyfans {
+      background: #0a5d7a;
+      border-color: #00aff0;
+      color: #ffffff;
+    }
+
+    .quick-link.onlyfans:hover {
+      background: #0d7a9e;
+    }
+
+    .quick-link.coomer {
+      background: #5a2a2a;
+      border-color: #ff6b6b;
+      color: #ffffff;
+    }
+
+    .quick-link.coomer:hover {
+      background: #6b3333;
+    }
+
+    .quick-link.kemono {
+      background: #2a4a2a;
+      border-color: #51cf66;
+      color: #ffffff;
+    }
+
+    .quick-link.kemono:hover {
+      background: #335a33;
+    }
+
+    .domain-dropdown {
+      background: #252525 !important;
+      border: 1px solid #3d3d3d !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    .domain-dropdown a {
+      color: #e0e0e0 !important;
+      border-bottom: 1px solid #2d2d2d !important;
+    }
+
+    .domain-dropdown a:hover {
+      background: #2d2d2d !important;
+      color: #ffffff !important;
+    }
+
+    /* Sections */
+    .section {
+      margin: 16px 0;
+      padding: 12px;
+      background: #1f1f1f;
+      border-radius: 6px;
+      border: 1px solid #2d2d2d;
+    }
+
+    .section label {
+      display: block;
+      margin: 8px 0;
+      color: #e0e0e0;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .section input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      background: #252525;
+      border: 1px solid #3d3d3d;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-size: 13px;
+      margin: 6px 0;
+    }
+
+    .section input[type="text"]:focus {
+      outline: none;
+      border-color: #4a9eff;
+    }
+
+    .section input[type="text"]:read-only {
+      background: #1a1a1a;
+      color: #888;
+      cursor: not-allowed;
+    }
+
+    /* Buttons */
+    button {
+      background: #2d2d2d;
+      color: #e0e0e0;
+      border: 1px solid #3d3d3d;
+      border-radius: 5px;
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    button:hover {
+      background: #353535;
+      border-color: #4d4d4d;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    #downloadBtn {
+      background: #4a9eff;
+      border-color: #4a9eff;
+      color: #ffffff;
+      font-weight: 500;
+    }
+
+    #downloadBtn:hover {
+      background: #357abd;
+      border-color: #357abd;
+    }
+
+    #cancelBtn {
+      background: #d32f2f;
+      border-color: #d32f2f;
+      color: #ffffff;
+    }
+
+    #cancelBtn:hover {
+      background: #b71c1c;
+      border-color: #b71c1c;
+    }
+
+    #changeFolderBtn, #fetchUrlBtn {
+      background: #2d2d2d;
+      border-color: #3d3d3d;
+    }
+
+    #changeFolderBtn:hover, #fetchUrlBtn:hover {
+      background: #353535;
+    }
+
+    /* Status messages */
+    .status {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .status.success {
+      background: #1e3a2e;
+      color: #51cf66;
+      border: 1px solid #2d5a3d;
+    }
+
+    .status.error {
+      background: #3a1e1e;
+      color: #ff6b6b;
+      border: 1px solid #5a2d2d;
+    }
+
+    .status.info {
+      background: #1e2a3a;
+      color: #4a9eff;
+      border: 1px solid #2d3d5a;
+    }
+
+    /* Segmented control */
+    .segmented {
+      display: flex;
+      background: #252525;
+      border: 1px solid #3d3d3d;
+      border-radius: 6px;
+      padding: 2px;
+      margin: 10px 0;
+    }
+
+    .segmented label {
+      flex: 1;
+      padding: 8px 12px;
+      text-align: center;
+      cursor: pointer;
+      color: #a0a0a0;
+      border-radius: 4px;
+      transition: all 0.2s;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .segmented label:hover {
+      background: #2d2d2d;
+      color: #e0e0e0;
+    }
+
+    .segmented input[type='radio'] {
+      display: none;
+    }
+
+    .segmented input[type='radio']:checked + label {
+      background: #4a9eff;
+      color: #ffffff;
+    }
+
+    .segmented label.checked {
+      background: #4a9eff;
+      color: #ffffff;
+    }
+
+    /* Custom checkbox */
+    .container-checkbox {
+      display: flex;
+      align-items: center;
+      position: relative;
+      padding-left: 32px;
+      margin: 10px 0;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .container-checkbox input {
+      position: absolute;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .container-checkbox .checkmark {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 20px;
+      width: 20px;
+      background: #252525;
+      border: 2px solid #3d3d3d;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .container-checkbox:hover .checkmark {
+      border-color: #4a9eff;
+    }
+
+    .container-checkbox input:checked ~ .checkmark {
+      background: #4a9eff;
+      border-color: #4a9eff;
+    }
+
+    .container-checkbox .checkmark:after {
+      content: '';
+      position: absolute;
+      display: none;
+      left: 6px;
+      top: 2px;
+      width: 5px;
+      height: 10px;
+      border: solid white;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+
+    .container-checkbox input:checked ~ .checkmark:after {
+      display: block;
+    }
+
+    /* Checkbox for Coomer section */
+    .section input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-right: 8px;
+      cursor: pointer;
+      accent-color: #4a9eff;
+    }
+
+    /* Progress bar */
+    #progressContainer {
+      margin-top: 12px;
+    }
+
+    #progressContainer > div:first-child {
+      background: #252525;
+      border: 1px solid #3d3d3d;
+    }
+
+    #progressFill {
+      background: linear-gradient(90deg, #4a9eff, #357abd) !important;
+    }
+
+    #progressText {
+      color: #a0a0a0;
+      font-size: 12px;
+    }
+
+    /* Container */
+    .container {
+      margin: 16px 0;
+      padding: 12px;
+      background: #1f1f1f;
+      border-radius: 6px;
+      border: 1px solid #2d2d2d;
+    }
+
+    /* Footer text */
+    .footer-text {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #2d2d2d;
+      text-align: center;
+      font-size: 11px;
+      color: #666;
+    }
+
+    .footer-text p {
+      margin: 4px 0;
+      color: #666;
+    }
+
+    /* Hidden sections */
+    [style*="display: none"] {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Universal Media Downloader</h1>
+  
+  <div id="siteIndicator">
+    <span id="currentSite">Detecting site...</span>
+  </div>
+
+  <!-- Quick Links -->
+  <div class="quick-links">
+    <a href="https://onlyfans.com" target="_blank" class="quick-link onlyfans" title="Open OnlyFans">
+      OnlyFans
+    </a>
+    <div style="position: relative; display: inline-block;">
+      <a href="https://coomer.st" target="_blank" class="quick-link coomer" title="Open Coomer">
+        Coomer
+      </a>
+      <div class="domain-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 4px; background: #252525; border: 1px solid #3d3d3d; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 1000; min-width: 120px;">
+        <a href="https://coomer.st" target="_blank" style="display: block; padding: 8px 12px; color: #e0e0e0; text-decoration: none; border-bottom: 1px solid #2d2d2d; font-size: 11px;">Coomer.st</a>
+        <a href="https://coomer.party" target="_blank" style="display: block; padding: 8px 12px; color: #e0e0e0; text-decoration: none; font-size: 11px;">Coomer.party</a>
+      </div>
+    </div>
+    <div style="position: relative; display: inline-block;">
+      <a href="https://kemono.cr" target="_blank" class="quick-link kemono" title="Open Kemono">
+        Kemono
+      </a>
+      <div class="domain-dropdown" style="display: none; position: absolute; top: 100%; left: 0; margin-top: 4px; background: #252525; border: 1px solid #3d3d3d; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 1000; min-width: 120px;">
+        <a href="https://kemono.cr" target="_blank" style="display: block; padding: 8px 12px; color: #e0e0e0; text-decoration: none; border-bottom: 1px solid #2d2d2d; font-size: 11px;">Kemono.cr</a>
+        <a href="https://kemono.party" target="_blank" style="display: block; padding: 8px 12px; color: #e0e0e0; text-decoration: none; font-size: 11px;">Kemono.party</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- OnlyFans Settings -->
+  <div id="onlyfansSection" style="display: none;">
+    <div class="container">
+      <p><strong>Video Quality</strong></p>
+      <div class="segmented">
+        <input type="radio" name="segmented" value="full" id="full" />
+        <label for="full">Original</label>
+        <input type="radio" name="segmented" value="240" id="240" />
+        <label for="240">240p</label>
+        <input type="radio" name="segmented" value="720" id="720" />
+        <label for="720">720p</label>
+      </div>
+      <span id="status" class="status" style="display: none;"></span>
+    </div>
+
+    <div class="container">
+      <label class="container-checkbox">
+        <input type="checkbox" id="folder" checked />
+        <span class="checkmark"></span>
+        Auto-create folder for creator
+      </label>
+    </div>
+
+    <div class="footer-text">
+      <p>Visit onlyfans.com - download buttons appear automatically</p>
+      <p style="color: #888; margin-top: 4px;"><em>Batch downloading is inconsistent</em></p>
+    </div>
+  </div>
+
+  <!-- Coomer/Kemono Settings -->
+  <div id="coomerSection" style="display: none;">
+    <div class="section">
+      <label>
+        <input type="checkbox" id="downloadImages" checked>
+        Download Images
+      </label>
+      <label>
+        <input type="checkbox" id="downloadVideos" checked>
+        Download Videos
+      </label>
+      <label>
+        <input type="checkbox" id="downloadCompressed" checked>
+        Download Compressed
+      </label>
+    </div>
+
+    <div class="section">
+      <label for="downloadFolder" style="display: block; margin-bottom: 6px;">Download Folder:</label>
+      <input type="text" id="downloadFolder" placeholder="Downloads/CoomerDL" readonly>
+      <button id="changeFolderBtn" style="width: 100%; margin-top: 6px;">Change Folder</button>
+    </div>
+
+    <div class="section">
+      <label>
+        <input type="checkbox" id="separatePosts" checked>
+        Separate posts into folders
+      </label>
+      <p style="margin-top: 6px; font-size: 11px; color: #888;">
+        Enabled: {folder}/{username}/{post-name}/<br>
+        Disabled: {folder}/{username}/
+      </p>
+    </div>
+
+    <div class="section">
+      <label for="customUrl" style="display: block; margin-bottom: 6px;">Coomer/Kemono URL:</label>
+      <input type="text" id="customUrl" placeholder="https://coomer.st/onlyfans/user/username/post/12345">
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button id="fetchUrlBtn" style="flex: 1;">Auto-Fetch</button>
+        <button id="downloadBtn" style="flex: 1;">Download</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div id="progressContainer" style="display: none;">
+        <div style="width: 100%; height: 20px; background: #252525; border: 1px solid #3d3d3d; border-radius: 10px; overflow: hidden; margin-bottom: 10px;">
+          <div id="progressFill" style="height: 100%; background: linear-gradient(90deg, #4a9eff, #357abd); width: 0%; transition: width 0.3s;"></div>
+        </div>
+        <p id="progressText" style="text-align: center; font-size: 12px; color: #a0a0a0; margin-bottom: 10px;">0 / 0 files</p>
+        <button id="cancelBtn" style="width: 100%;">Cancel</button>
+      </div>
+    </div>
+
+    <div class="footer-text">
+      <p>Supports: Coomer/Kemono sites (auto-detects domains)</p>
+      <p style="font-size: 10px; color: #666; margin-top: 4px;">
+        Domains: .st, .cr, .party, .net, .lol
+      </p>
+      <p style="font-size: 10px; color: #666; margin-top: 4px;">
+        Tip: Disable "Ask where to save each file" in Chrome settings
+      </p>
+    </div>
+  </div>
+
+  <div id="status" class="status" style="display: none;"></div>
+
+  <script src="site_detection.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
